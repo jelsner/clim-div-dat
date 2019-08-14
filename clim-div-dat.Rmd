@@ -57,15 +57,16 @@ ggplot(dfL, aes(x = Year, y = Variable)) +
   geom_smooth(method = lm) +
   facet_wrap(~ Month)
 ```
+
+Without the points and on a single graph.
 ```{r}
 ggplot(dfL, aes(x = Year, y = Variable, color = Month)) +
   geom_smooth(method = lm)
 ```
 
 Make this a slope graph.
-https://ibecav.github.io/CGPfunctions/reference/newggslopegraph.html
 
-First compute regressions for each month.
+First compute regressions for each month. Here I use the **broom** package.
 ```{r}
 library(broom)
 
@@ -77,5 +78,21 @@ Predictions <- dfL %>%
   group_by(Month) %>%
   do(tidy(predict(lm(Variable ~ Year, data = .), 
                   newdata = data.frame(Year = c(1940, 2018)))))
+```
+
+Try with the **purrr* package.
+```{r}
+Predictions <- dfL %>%
+  split(.$Month) %>%  # base R
+  map(~ lm(Variable ~ Year, data = .)) %>%
+  map(predict, newdata = data.frame(Year = c(1940, 2018))) %>%
+  as.data.frame() %>%
+  mutate(Year = c("1940", "2018")) %>%
+  melt(id.vars = "Year")
+```
+
+Get code from Chuck Powell: https://ibecav.github.io/CGPfunctions/reference/newggslopegraph.html
+```{r}
+library(CGPfunctions)
 ```
      
