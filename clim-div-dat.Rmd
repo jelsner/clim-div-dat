@@ -1,6 +1,8 @@
 ---
 title: "Climate Division Data"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r}
@@ -10,7 +12,7 @@ library(tidyverse)
 https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00005#
 
 ```{r}
-url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmincy-v1.0.0-20190805"
+url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-pcpncy-v1.0.0-20190805"
 df <- read.table(file = url,
                  colClasses = c("character", rep("numeric", times = 12)),
                  col.names = c("ID_Year", month.abb)) %>%
@@ -25,12 +27,36 @@ Leon County Florida is STID = 08, CTYID = 073 (see `county-readme.txt`).
 ```{r}
 df <- df %>%
   filter(STID == "08", CTYID == "073") %>%
-  filter(Year < 2019)
+  filter(Year < 2019, Year >= 1940)
 ```
 
 ```{r}
-ggplot(df, aes(x = Year, y = Nov)) +
+ggplot(df, aes(x = Year, y = Feb)) +
   geom_point() +
   geom_smooth(method = lm)
 ```
+
+```{r}
+dfL <- df %>%
+  select(Year, Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec) %>%
+  gather(key = Year,
+         value = "Variable",
+         factor_key = TRUE) %>%
+  rename(Month = Year) %>%
+  mutate(Year = rep(1940:2018, times = 12))
+head(dfL)
+```
+
+The `gather()` function takes all the values as measured except those named in `key =` argument. All variables are measured (precipitation in units of inches) except `Year`. `Year` is a vector identifying the month.
+
+The long data frame lists the key variable names as the first column taking the column names as character strings starting with `Jan`. To preserve the order of the columns (e.g., January comes before February, etc) we specify the `factor_key = TRUE`. We use `rename()` to give the key variable the correct name.
+
+```{r}
+ggplot(dfL, aes(x = Year, y = Variable)) +
+  geom_point() +
+  geom_smooth(method = lm) +
+  facet_wrap(~ Month)
+```
+```
+
 
