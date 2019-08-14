@@ -12,7 +12,7 @@ library(tidyverse)
 https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00005#
 
 ```{r}
-url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-pcpncy-v1.0.0-20190805"
+url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmpccy-v1.0.0-20190805"
 df <- read.table(file = url,
                  colClasses = c("character", rep("numeric", times = 12)),
                  col.names = c("ID_Year", month.abb)) %>%
@@ -57,6 +57,25 @@ ggplot(dfL, aes(x = Year, y = Variable)) +
   geom_smooth(method = lm) +
   facet_wrap(~ Month)
 ```
+```{r}
+ggplot(dfL, aes(x = Year, y = Variable, color = Month)) +
+  geom_smooth(method = lm)
 ```
 
+Make this a slope graph.
+https://ibecav.github.io/CGPfunctions/reference/newggslopegraph.html
 
+First compute regressions for each month.
+```{r}
+library(broom)
+
+Trends <- dfL %>%
+  group_by(Month) %>%
+  do(tidy(lm(Variable ~ Year, data = .)))
+
+Predictions <- dfL %>%
+  group_by(Month) %>%
+  do(tidy(predict(lm(Variable ~ Year, data = .), 
+                  newdata = data.frame(Year = c(1940, 2018)))))
+```
+     
