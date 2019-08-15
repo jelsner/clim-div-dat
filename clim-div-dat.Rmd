@@ -12,15 +12,15 @@ library(tidyverse)
 https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00005#
 
 ```{r}
-url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmpccy-v1.0.0-20190805"
+url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-pcpncy-v1.0.0-20190805"
 df <- read.table(file = url,
                  colClasses = c("character", rep("numeric", times = 12)),
-                 col.names = c("ID_Year", month.abb)) %>%
+                 col.names = c("ID_Year", month.name)) %>%
   transform(STID = substr(ID_Year, 1, 2),
             CTYID = substr(ID_Year, 3, 5),
             DataType = substr(ID_Year, 6, 7),
             Year = as.numeric(substr(ID_Year, 8, 11))) %>%
-  select(STID, CTYID, Year, month.abb)
+  select(STID, CTYID, Year, month.name)
 ```
 
 Leon County Florida is STID = 08, CTYID = 073 (see `county-readme.txt`).
@@ -38,7 +38,8 @@ ggplot(df, aes(x = Year, y = Feb)) +
 
 ```{r}
 dfL <- df %>%
-  select(Year, Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec) %>%
+  select(Year, January, February, March, April, May, June, July, 
+         August, September, October, November, December) %>%
   gather(key = Year,
          value = "Variable",
          factor_key = TRUE) %>%
@@ -104,7 +105,8 @@ newggslopegraph(Predictions, Year, value, variable)
 Better.
 ```{r}
 newggslopegraph(Predictions, Year, value, variable,
-                Title = "Trends in Monthly Average Temperatures (°F)",
+#                Title = "Monthly Average Temperatures (°F)",
+                Title = "Monthly Average Precipitation (in)",
                 SubTitle = "Leon County, FL",
                 LineColor = "gray50",
                 Caption = "Data: NOAA, nCLIMDIV",
@@ -166,7 +168,7 @@ ggplot(data = Predictions, aes(x = Year, y = value, group = variable)) +
              label.size = 0.0) +
   MySpecial +
   labs(
-    title = "Trends in Monthly Average Temperatures (°F",
+    title = "Trends in Monthly Average Temperatures (°F)",
     subtitle = "Leon County, FL",
     caption = "Data: NOAA, nCLIMDIV"
   )
