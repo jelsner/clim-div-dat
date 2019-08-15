@@ -9,10 +9,77 @@ editor_options:
 library(tidyverse)
 ```
 
+
 https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00005#
 
+From the county-readme.txt file:
+
+climdiv-pcpncy-vx.y.z-YYYYMMDD
+climdiv-tmaxcy-vx.y.z-YYYYMMDD
+climdiv-tmincy-vx.y.z-YYYYMMDD
+climdiv-tmpccy-vx.y.z-YYYYMMDD
+
+The variables in this file are sequential climatic county  monthly maximum, minimum and average temperature (deg. F. to 10ths) and precipitation (inches to 100ths). 
+Period of record is 1895 through latest month available, updated monthly. Values from the most recent two calendar years will be updated on a monthly 
+basis.  Period of record updates will occur when the underlying data set undergoes a version change.
+
+County values in nClimDiv were derived from area-weighted averages of grid-point estimates interpolated from station data.  A nominal grid resolution of 5 km 
+was used to ensure that all divisions had sufficient spatial sampling (only four small divisions had less than 100 points) and because the impact of 
+elevation on precipitation is minimal below 5 km.  Station data were gridded via climatologically aided interpolation to minimize biases from topographic 
+and network variability.
+
+The Global Historical Climatology Network (GHCN)  Daily dataset is the source of station data for nClimDiv.  GHCN-Daily contains several major observing 
+networks in North America, five of which are used here.  The primary network is the National Weather Service (NWS) Cooperative Observing (COOP) program, 
+which consists of stations operated by volunteers as well as by agencies such as the Federal Aviation Administration.  To improve coverage in western states 
+and along international borders, nClimDiv also includes the National Interagency Fire Center (NIFC) Remote Automatic Weather Station (RAWS) network, 
+the USDA Snow Telemetry (SNOTEL) network, the Environment Canada (EC) network (south of 52N), and part of Mexicos Servicio Meteorologico Nacional 
+(SMN) network (north of 24N).  Note that nClimDiv does not incorporate precipitation data from RAWS because that networks tipping-bucket gauges are 
+unheated, leading to suspect cold-weather data.
+
+All GHCN-Daily stations are routinely processed through a suite of logical, serial, and spatial quality assurance reviews to identify erroneous 
+observations.  For nClimDiv, all such data were set to missing before computing monthly values, which in turn were subjected to additional serial 
+and spatial checks to eliminate residual outliers. Stations having at least 10 years of valid monthly data since 1950 were used in nClimDiv.
+
+For temperature, bias adjustments were computed to account for historical changes in observation time, station location, temperature instrumentation, 
+and siting conditions.  Changes in observation time are only problematic for the COOP network whereas changes in station location and instrumentation occur 
+in almost all surface networks.   As in the U.S. Historical Climatology Network version 2.5, the method of Karl et al. (1986) was applied to remove the 
+observation time bias from the COOP network, and the pairwise method of Menne and Williams (2009) was used to address changes in station location and 
+instrumentation in all networks.  Because the pairwise method also largely accounts for local, unrepresentative trends that arise from changes in siting 
+conditions, nClimDiv contains no separate adjustment in that regard. For additional information on how nClimDiv is constructed, please see:
+http://journals.ametsoc.org/doi/abs/10.1175/JAMC-D-13-0248.1
+
+STATE CODE TABLE: Range of values of 01-48.
+
+01 Alabama                 28 New Jersey
+02 Arizona                 29 New Mexico
+03 Arkansas                30 New York
+04 California              31 North Carolina
+05 Colorado                32 North Dakota
+06 Connecticut             33 Ohio
+07 Delaware                34 Oklahoma
+08 Florida                 35 Oregon
+09 Georgia                 36 Pennsylvania
+10 Idaho                   37 Rhode Island
+11 Illinois                38 South Carolina
+12 Indiana                 39 South Dakota
+13 Iowa                    40 Tennessee
+14 Kansas                  41 Texas
+15 Kentucky                42 Utah
+16 Louisiana               43 Vermont
+17 Maine                   44 Virginia
+18 Maryland                45 Washington
+19 Massachusetts           46 West Virginia
+20 Michigan                47 Wisconsin
+21 Minnesota               48 Wyoming
+22 Mississippi
+23 Missouri   
+24 Montana   
+25 Nebraska 
+26 Nevada  
+27 New Hampshire
+
 ```{r}
-url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmaxcy-v1.0.0-20190805"
+url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmincy-v1.0.0-20190805"
 df <- read.table(file = url,
                  colClasses = c("character", rep("numeric", times = 12)),
                  col.names = c("ID_Year", month.name)) %>%
@@ -37,6 +104,7 @@ ggplot(df, aes(x = Year, y = February)) +
   geom_smooth(method = lm)
 ```
 
+Make a wide data frame.
 ```{r}
 dfL <- df %>%
   select(Year, January, February, March, April, May, June, July, 
@@ -49,9 +117,7 @@ dfL <- df %>%
 head(dfL)
 ```
 
-The `gather()` function takes all the values as measured except those named in `key =` argument. All variables are measured (e.g., precipitation in units of hundredths of inches) except `Year`. `Year` is a vector identifying the month.
-
-The long data frame lists the key variable names as the first column taking the column names as character strings starting with `Jan`. To preserve the order of the columns (e.g., January comes before February, etc) we specify the `factor_key = TRUE`. We use `rename()` to give the key variable the correct name.
+The `gather()` function takes all the values as measured except those named in `key =` argument. All variables are measured (e.g., precipitation in units of hundredths of inches) except `Year`. `Year` is a vector identifying the month. The long data frame lists the key variable names as the first column taking the column names as character strings starting with `January`. To preserve the order of the columns (e.g., January comes before February, etc) we specify the `factor_key = TRUE`. We use `rename()` to give the key variable the correct name.
 
 ```{r}
 ggplot(dfL, aes(x = Year, y = Variable)) +
@@ -60,15 +126,13 @@ ggplot(dfL, aes(x = Year, y = Variable)) +
   facet_wrap(~ Month)
 ```
 
-Without the points and on a single graph.
+Without the points and on a single graph. Slope graph.
 ```{r}
 ggplot(dfL, aes(x = Year, y = Variable, color = Month)) +
   geom_smooth(method = lm, se = FALSE)
 ```
 
-Make this a slope graph.
-
-Use the `map()` function in the **purrr** package (part of the **tidyverse**).
+Improve the slope graph. Use the `map()` function in the **purrr** package (part of the **tidyverse**).
 ```{r}
 library(reshape2)
 
@@ -87,7 +151,7 @@ Get code from Chuck Powell: https://ibecav.github.io/CGPfunctions/reference/newg
 library(CGPfunctions)
 ```
 
-Better.
+Use his code directly.
 ```{r}
 newggslopegraph(Predictions, Year, value, variable,
 #                Title = "Monthly Average Temperatures (°F)",
@@ -98,7 +162,6 @@ newggslopegraph(Predictions, Year, value, variable,
                 LineThickness = .5,
                 YTextSize = 3,
                 DataLabelPadding = .05)
-
 ```
 
 From scratch.
@@ -153,8 +216,8 @@ ggplot(data = Predictions, aes(x = Year, y = value, group = variable)) +
              label.size = 0.0) +
   MySpecial +
   labs(
-#    title = "Monthly Average Temperatures (°F)",
-    title = "Monthly Average Precipitation (in)",
+    title = "Average Daily Low Temperature (°F)",
+#    title = "Monthly Average Precipitation (in)",
     subtitle = "Leon County, FL",
     caption = "Data: NOAA, nCLIMDIV"
   )
