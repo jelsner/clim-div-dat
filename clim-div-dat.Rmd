@@ -12,7 +12,7 @@ library(tidyverse)
 https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00005#
 
 ```{r}
-url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-pcpncy-v1.0.0-20190805"
+url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmaxcy-v1.0.0-20190805"
 df <- read.table(file = url,
                  colClasses = c("character", rep("numeric", times = 12)),
                  col.names = c("ID_Year", month.name)) %>%
@@ -30,8 +30,9 @@ df <- df %>%
   filter(Year < 2019, Year >= 1940)
 ```
 
+Plot a single month.
 ```{r}
-ggplot(df, aes(x = Year, y = Feb)) +
+ggplot(df, aes(x = Year, y = February)) +
   geom_point() +
   geom_smooth(method = lm)
 ```
@@ -48,7 +49,7 @@ dfL <- df %>%
 head(dfL)
 ```
 
-The `gather()` function takes all the values as measured except those named in `key =` argument. All variables are measured (precipitation in units of inches) except `Year`. `Year` is a vector identifying the month.
+The `gather()` function takes all the values as measured except those named in `key =` argument. All variables are measured (e.g., precipitation in units of hundredths of inches) except `Year`. `Year` is a vector identifying the month.
 
 The long data frame lists the key variable names as the first column taking the column names as character strings starting with `Jan`. To preserve the order of the columns (e.g., January comes before February, etc) we specify the `factor_key = TRUE`. We use `rename()` to give the key variable the correct name.
 
@@ -62,26 +63,12 @@ ggplot(dfL, aes(x = Year, y = Variable)) +
 Without the points and on a single graph.
 ```{r}
 ggplot(dfL, aes(x = Year, y = Variable, color = Month)) +
-  geom_smooth(method = lm)
+  geom_smooth(method = lm, se = FALSE)
 ```
 
 Make this a slope graph.
 
-First compute regressions for each month. Here I use the **broom** package.
-```{r, eval=FALSE}
-library(broom)
-
-Trends <- dfL %>%
-  group_by(Month) %>%
-  do(tidy(lm(Variable ~ Year, data = .)))
-
-Predictions <- dfL %>%
-  group_by(Month) %>%
-  do(tidy(predict(lm(Variable ~ Year, data = .), 
-                  newdata = data.frame(Year = c(1940, 2018)))))
-```
-
-Try with the **purrr* package.
+Use the `map()` function in the **purrr** package (part of the **tidyverse**).
 ```{r}
 library(reshape2)
 
@@ -98,8 +85,6 @@ Predictions <- dfL %>%
 Get code from Chuck Powell: https://ibecav.github.io/CGPfunctions/reference/newggslopegraph.html
 ```{r}
 library(CGPfunctions)
-
-newggslopegraph(Predictions, Year, value, variable)
 ```
 
 Better.
@@ -147,7 +132,7 @@ MySpecial <- list(
 library(ggrepel)
 
 ggplot(data = Predictions, aes(x = Year, y = value, group = variable)) +
-  geom_line(color = "gray", size = 1) +
+  geom_line(color = "gray", size = .5) +
   geom_text_repel(data = Predictions %>% filter(Year == "1940"), 
                   aes(label = variable) , 
                   hjust = "left", 
@@ -168,7 +153,8 @@ ggplot(data = Predictions, aes(x = Year, y = value, group = variable)) +
              label.size = 0.0) +
   MySpecial +
   labs(
-    title = "Trends in Monthly Average Temperatures (°F)",
+#    title = "Monthly Average Temperatures (°F)",
+    title = "Monthly Average Precipitation (in)",
     subtitle = "Leon County, FL",
     caption = "Data: NOAA, nCLIMDIV"
   )
