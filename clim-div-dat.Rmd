@@ -9,6 +9,7 @@ editor_options:
 library(tidyverse)
 ```
 
+## Climate data
 
 https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00005#
 
@@ -50,77 +51,89 @@ http://journals.ametsoc.org/doi/abs/10.1175/JAMC-D-13-0248.1
 
 STATE CODE TABLE: Range of values of 01-48.
 
-01 Alabama                 28 New Jersey
-02 Arizona                 29 New Mexico
-03 Arkansas                30 New York
-04 California              31 North Carolina
-05 Colorado                32 North Dakota
-06 Connecticut             33 Ohio
-07 Delaware                34 Oklahoma
-08 Florida                 35 Oregon
-09 Georgia                 36 Pennsylvania
-10 Idaho                   37 Rhode Island
-11 Illinois                38 South Carolina
-12 Indiana                 39 South Dakota
-13 Iowa                    40 Tennessee
-14 Kansas                  41 Texas
-15 Kentucky                42 Utah
-16 Louisiana               43 Vermont
-17 Maine                   44 Virginia
-18 Maryland                45 Washington
-19 Massachusetts           46 West Virginia
-20 Michigan                47 Wisconsin
-21 Minnesota               48 Wyoming
-22 Mississippi
-23 Missouri   
-24 Montana   
-25 Nebraska 
-26 Nevada  
-27 New Hampshire
+01 Alabama 01                28 New Jersey 34
+02 Arizona 04                29 New Mexico 35
+03 Arkansas 05               30 New York 36
+04 California 06             31 North Carolina 37
+05 Colorado 08               32 North Dakota 38
+06 Connecticut 09            33 Ohio 39
+07 Delaware 10               34 Oklahoma 40
+08 Florida 12                35 Oregon 41
+09 Georgia 13                36 Pennsylvania 42
+10 Idaho 16                  37 Rhode Island 44
+11 Illinois 17               38 South Carolina 45
+12 Indiana 18                39 South Dakota 46
+13 Iowa 19                   40 Tennessee 47
+14 Kansas 20                 41 Texas 48
+15 Kentucky 21               42 Utah 49
+16 Louisiana 22              43 Vermont 50
+17 Maine 23                  44 Virginia 51
+18 Maryland 24               45 Washington 53
+19 Massachusetts 25          46 West Virginia 54
+20 Michigan 26               47 Wisconsin 55
+21 Minnesota 27              48 Wyoming 56
+22 Mississippi 28
+23 Missouri 29  
+24 Montana 30  
+25 Nebraska 31
+26 Nevada 32 
+27 New Hampshire 33
 
 ```{r}
+stfips <- c("01", "04", "05", "06", "08", "09", "10", "12", "13", "16", "17", "18", "19", "20", "21", "22", "23", "24",
+            "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42",
+            "44", "45", "46", "47", "48", "49", "50", "51", "53", "54", "55", "56")
+
 url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmincy-v1.0.0-20190805"
 df <- read.table(file = url,
                  colClasses = c("character", rep("numeric", times = 12)),
                  col.names = c("ID_Year", month.name)) %>%
-  transform(STID = substr(ID_Year, 1, 2),
-            CTYID = substr(ID_Year, 3, 5),
+  transform(STID = as.integer(substr(ID_Year, 1, 2)),
+            CTYFIPS = substr(ID_Year, 3, 5),
             DataType = substr(ID_Year, 6, 7),
             Year = as.numeric(substr(ID_Year, 8, 11))) %>%
-  select(STID, CTYID, Year, month.name)
+  mutate(STFIPS = stfips[STID],
+         FIPS = paste0(STFIPS, CTYFIPS)) %>%
+  select(FIPS, STFIPS, Year, month.name)
 ```
 
-Leon County Florida is STID = 08, CTYID = 073 (see `county-readme.txt`).
+Leon County Florida is STID = 08, CTYFIPS = 073 (see `county-readme.txt`).
 ```{r}
-df <- df %>%
-  filter(STID == "08", CTYID == "073") %>%
-  filter(Year < 2019, Year >= 1940)
+Climate <- df %>%
+  filter(FIPS == "12073") %>%
+  filter(Year < 2019, Year >= 1900)
+
+coef(lm(April ~ Year, data = Climate))
+
+X <- Climate %>%
+  filter(Year %in% seq(1900, 2010, by = 10)) 
+coef(lm(April ~ Year, data = X))
 ```
 
 Plot a single month.
 ```{r}
-ggplot(df, aes(x = Year, y = February)) +
+ggplot(Climate, aes(x = Year, y = February)) +
   geom_point() +
   geom_smooth(method = lm)
 ```
 
-Make a wide data frame.
+Make a long data frame.
 ```{r}
-dfL <- df %>%
+ClimateL <- Climate %>%
   select(Year, January, February, March, April, May, June, July, 
          August, September, October, November, December) %>%
   gather(key = Year,
          value = "Variable",
          factor_key = TRUE) %>%
   rename(Month = Year) %>%
-  mutate(Year = rep(1940:2018, times = 12))
-head(dfL)
+  mutate(Year = rep(1900:2018, times = 12))
+head(ClimateL)
 ```
 
 The `gather()` function takes all the values as measured except those named in `key =` argument. All variables are measured (e.g., precipitation in units of hundredths of inches) except `Year`. `Year` is a vector identifying the month. The long data frame lists the key variable names as the first column taking the column names as character strings starting with `January`. To preserve the order of the columns (e.g., January comes before February, etc) we specify the `factor_key = TRUE`. We use `rename()` to give the key variable the correct name.
 
 ```{r}
-ggplot(dfL, aes(x = Year, y = Variable)) +
+ggplot(ClimateL, aes(x = Year, y = Variable)) +
   geom_point() +
   geom_smooth(method = lm) +
   facet_wrap(~ Month)
@@ -128,7 +141,7 @@ ggplot(dfL, aes(x = Year, y = Variable)) +
 
 Without the points and on a single graph. Slope graph.
 ```{r}
-ggplot(dfL, aes(x = Year, y = Variable, color = Month)) +
+ggplot(ClimateL, aes(x = Year, y = Variable, color = Month)) +
   geom_smooth(method = lm, se = FALSE)
 ```
 
@@ -136,7 +149,7 @@ Improve the slope graph. Use the `map()` function in the **purrr** package (part
 ```{r}
 library(reshape2)
 
-Predictions <- dfL %>%
+Predictions <- ClimateL %>%
   split(.$Month) %>%  # base R
   map(~ lm(Variable ~ Year, data = .)) %>%
   map(predict, newdata = data.frame(Year = c(1940, 2018))) %>%
@@ -223,7 +236,8 @@ ggplot(data = Predictions, aes(x = Year, y = value, group = variable)) +
   )
 ```
 
-Population data.
+## Population data
+
 ```{r}
 library(USAboundaries)
 library(sf)
@@ -246,77 +260,97 @@ EPSG:102004 USA_Contiguous_Lambert_Conformal_Conic
 
 Get 2010 county boundaries.
 ```{r}
-KS_counties <- us_counties(map_date = "2000-01-01", states = "Kansas") %>%
+Counties <- us_counties(map_date = "2000-12-31", states = "Florida") %>%
   st_transform(crs = 102004)
+n_counties <- nrow(Counties)
 ```
 
-Create a single sf data frame with year, population, and point geometry. Loop over all decennial years getting cities.
+Create a single sf data frame with year, population, and point geometry containing the county wide total population in cities. Loop over all decennial years getting cities.
 ```{r}
-CNTY_Pop <- NULL
+CITY_Pop <- NULL
+
 for(yr in seq(1890, 2010, by = 10)){
-cities <- us_cities(map_date = yr, states = "Kansas") %>%
+cities <- us_cities(map_date = yr, states = "Florida") %>%
   st_transform(crs = 102004) %>%
   dplyr::select(population) %>%
-  aggregate(by = KS_counties, FUN = "sum") %>%
-  dplyr::mutate(Year = yr, name = KS_counties$name, fips = KS_counties$fips) %>%
-  dplyr::select(name, fips, Year, population, geometry)
+  aggregate(by = Counties, FUN = "sum") %>%
+  mutate(Years = yr, Name = Counties$name, FIPS = Counties$fips, Area = as.numeric(st_area(geometry)), popD = as.factor(round(log(population/Area)))) %>%
+  uncount(10) %>%
+  mutate(Year = rep(seq(yr, yr + 9), times = n_counties)) %>%
+  dplyr::select(Name, FIPS, Year, Years, population, Area, popD, geometry)
 
-CNTY_Pop <- rbind(CNTY_Pop, cities)
+CITY_Pop <- rbind(CITY_Pop, cities)
 }
+
+CITY_Pop$popD[is.na(CITY_Pop$popD)] <- -7
 ```
 
 Plot time series.
 ```{r}
 library(ggplot2)
-CNTY_Pop %>%
-  dplyr::filter(fips == 20209) %>%
+CITY_Pop %>%
+  dplyr::filter(Name == "LEON") %>%
   ggplot(aes(x = Year, y = population)) +
   geom_line()
 
-CNTY_Pop %>%
+CITY_Pop %>%
   ggplot(aes(x = Year, y = population)) +
   geom_line() +
-  facet_wrap(~ name)
+  facet_wrap(~ Name)
 ```
 
+## Combine population data with climate data
 
-
-Subset. Get all cities within a specified county for all decennial years.
 ```{r}
-SHAWNEE <- KS_counties %>% 
-  dplyr::filter(name == "SHAWNEE")
-
-SHAWNEE_cities <- Cities[SHAWNEE, ]
-
-X <- KS_counties %>% 
-  dplyr::filter(name == "JOHNSON")
-
-X_cities <- Cities[X, ]
+Climate <- df %>%
+  filter(STFIPS == "12")
 ```
 
-Aggregate function.
 ```{r}
-XX <- Cities %>%
-  dplyr::select(year, population)
-zz <- aggregate(x = XX, by = KS_counties, FUN = "sum")
+Test <- Climate %>%
+  left_join(CITY_Pop) %>%
+  filter(!is.na(Name)) %>%
+  mutate(Year = Year)
 ```
 
-
-
-
-
-
-City population summed at the modern counties level.
+Make a long data frame.
 ```{r}
-library(areal)
-
-ar_validate(KS_counties,
-               tid = "id_num",
-               source = X1,
-               sid = "city",
-               extensive = "population",
-               weight = "sum",
-               output = "sf", verbose = TRUE)
+TestL <- Test %>%
+  dplyr::select(Year, January, February, March, April, May, June, July, 
+         August, September, October, November, December) %>%
+  gather(key = Year,
+         value = "Variable",
+         factor_key = TRUE) %>%
+  rename(Month = Year, Temperature = Variable) %>%
+  mutate(Year = rep(Test$Year, times = 12),
+         popD = rep(Test$popD, times = 12))
+head(TestL)
 ```
 
+## Model
 
+Use the population density (rounded) as a random effect.
+```{r}
+library(brms)
+
+TestL$YearC <- TestL$Year - 1960
+
+family <- gaussian()
+formula <- Temperature ~ YearC + (1 | Month) + (1 | popD)
+#formula <- Temperature ~ Year
+
+get_prior(formula, data = TestL, family = family)
+
+fit1 <- brm(formula = formula,
+            data = TestL,
+            family = family,
+            prior = c(set_prior("normal(0, 5)", class = "b"),
+                     set_prior("student_t(3, 55, 17)", class = "Intercept"),
+                     set_prior("student_t(3, 0, 17)", class = "sd"),
+                     set_prior("student_t(3, 0, 17)", class = "sigma")),
+#                     set_prior("lkj(1)", class = "cor")),
+           control = list(adapt_delta = .9, max_treedepth = 15),
+           seed = 09121)
+
+fixef(fit1)
+```
