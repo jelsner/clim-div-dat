@@ -222,3 +222,101 @@ ggplot(data = Predictions, aes(x = Year, y = value, group = variable)) +
     caption = "Data: NOAA, nCLIMDIV"
   )
 ```
+
+Population data.
+```{r}
+library(USAboundaries)
+library(sf)
+
+KS_counties_1895 <- us_counties("1895-01-01", states = "Kansas")
+plot(st_geometry(KS_counties_1895))
+title("Kansas county boundaries on January 1, 1895")
+
+KS_cities_1895 <- us_cities(map_date = 1895, states = "Kansas")
+KS_cities_1995 <- us_cities(map_date = 1995, states = "Kansas")
+
+plot(st_geometry(KS_cities_1995), col = "red", add = TRUE)
+plot(st_geometry(KS_cities_1895), add = TRUE)
+
+
+```
+
+EPSG:102004 USA_Contiguous_Lambert_Conformal_Conic
++proj=lcc +lat_1=33 +lat_2=45 +lat_0=39 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs
+
+Get 2010 county boundaries.
+```{r}
+KS_counties <- us_counties(map_date = "2000-01-01", states = "Kansas") %>%
+  st_transform(crs = 102004)
+```
+
+Create a single sf data frame with year, population, and point geometry. Loop over all decennial years getting cities.
+```{r}
+CNTY_Pop <- NULL
+for(yr in seq(1890, 2010, by = 10)){
+cities <- us_cities(map_date = yr, states = "Kansas") %>%
+  st_transform(crs = 102004) %>%
+  dplyr::select(population) %>%
+  aggregate(by = KS_counties, FUN = "sum") %>%
+  dplyr::mutate(Year = yr, name = KS_counties$name, fips = KS_counties$fips) %>%
+  dplyr::select(name, fips, Year, population, geometry)
+
+CNTY_Pop <- rbind(CNTY_Pop, cities)
+}
+```
+
+Plot time series.
+```{r}
+library(ggplot2)
+CNTY_Pop %>%
+  dplyr::filter(fips == 20209) %>%
+  ggplot(aes(x = Year, y = population)) +
+  geom_line()
+
+CNTY_Pop %>%
+  ggplot(aes(x = Year, y = population)) +
+  geom_line() +
+  facet_wrap(~ name)
+```
+
+
+
+Subset. Get all cities within a specified county for all decennial years.
+```{r}
+SHAWNEE <- KS_counties %>% 
+  dplyr::filter(name == "SHAWNEE")
+
+SHAWNEE_cities <- Cities[SHAWNEE, ]
+
+X <- KS_counties %>% 
+  dplyr::filter(name == "JOHNSON")
+
+X_cities <- Cities[X, ]
+```
+
+Aggregate function.
+```{r}
+XX <- Cities %>%
+  dplyr::select(year, population)
+zz <- aggregate(x = XX, by = KS_counties, FUN = "sum")
+```
+
+
+
+
+
+
+City population summed at the modern counties level.
+```{r}
+library(areal)
+
+ar_validate(KS_counties,
+               tid = "id_num",
+               source = X1,
+               sid = "city",
+               extensive = "population",
+               weight = "sum",
+               output = "sf", verbose = TRUE)
+```
+
+
