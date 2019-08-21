@@ -84,7 +84,7 @@ stfips <- c("01", "04", "05", "06", "08", "09", "10", "12", "13", "16", "17", "1
             "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42",
             "44", "45", "46", "47", "48", "49", "50", "51", "53", "54", "55", "56")
 
-url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmincy-v1.0.0-20190805"
+url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmaxcy-v1.0.0-20190805"
 df <- read.table(file = url,
                  colClasses = c("character", rep("numeric", times = 12)),
                  col.names = c("ID_Year", month.name)) %>%
@@ -101,7 +101,7 @@ Leon County Florida is STID = 08, CTYFIPS = 073 (see `county-readme.txt`).
 ```{r}
 Climate <- df %>%
   filter(FIPS == "12073") %>%
-  filter(Year < 2019, Year >= 1900)
+  filter(Year < 2019)
 
 coef(lm(April ~ Year, data = Climate))
 
@@ -179,7 +179,6 @@ newggslopegraph(Predictions, Year, value, variable,
 
 From scratch.
 ```{r}
-
 MySpecial <- list(  
   # move the x axis labels up top
   scale_x_discrete(position = "top"),
@@ -251,8 +250,6 @@ KS_cities_1995 <- us_cities(map_date = 1995, states = "Kansas")
 
 plot(st_geometry(KS_cities_1995), col = "red", add = TRUE)
 plot(st_geometry(KS_cities_1895), add = TRUE)
-
-
 ```
 
 EPSG:102004 USA_Contiguous_Lambert_Conformal_Conic
@@ -274,15 +271,14 @@ cities <- us_cities(map_date = yr, states = "Florida") %>%
   st_transform(crs = 102004) %>%
   dplyr::select(population) %>%
   aggregate(by = Counties, FUN = "sum") %>%
-  mutate(Years = yr, Name = Counties$name, FIPS = Counties$fips, Area = as.numeric(st_area(geometry)), popD = as.factor(round(log(population/Area)))) %>%
-  uncount(10) %>%
+  mutate(CensusYear = yr, Name = Counties$name, FIPS = Counties$fips, Area = as.numeric(st_area(geometry)), popD = round(log(population/Area))) %>%
+  uncount(10) %>% # duplicates data frame 10 times
   mutate(Year = rep(seq(yr, yr + 9), times = n_counties)) %>%
-  dplyr::select(Name, FIPS, Year, Years, population, Area, popD, geometry)
+  dplyr::select(Name, FIPS, Year, CensusYear, population, Area, popD, geometry)
 
 CITY_Pop <- rbind(CITY_Pop, cities)
 }
-
-CITY_Pop$popD[is.na(CITY_Pop$popD)] <- -7
+CITY_Pop$population[is.na(CITY_Pop$population)] <- 0
 ```
 
 Plot time series.
@@ -301,16 +297,36 @@ CITY_Pop %>%
 
 ## Combine population data with climate data
 
+Get the temperature data
+```{r}
+stfips <- c("01", "04", "05", "06", "08", "09", "10", "12", "13", "16", "17", "18", "19", "20", "21", "22", "23", "24",
+            "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42",
+            "44", "45", "46", "47", "48", "49", "50", "51", "53", "54", "55", "56")
+
+url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/climdiv-tmpccy-v1.0.0-20190805"
+df <- read.table(file = url,
+                 colClasses = c("character", rep("numeric", times = 12)),
+                 col.names = c("ID_Year", month.name)) %>%
+  transform(STID = as.integer(substr(ID_Year, 1, 2)),
+            CTYFIPS = substr(ID_Year, 3, 5),
+            DataType = substr(ID_Year, 6, 7),
+            Year = as.numeric(substr(ID_Year, 8, 11))) %>%
+  mutate(STFIPS = stfips[STID],
+         FIPS = paste0(STFIPS, CTYFIPS)) %>%
+  select(FIPS, STFIPS, Year, month.name)
+```
+
+Leon County only. Remove years before 2019.  Orlando (Orange County) 12095, Miami (Miami-Dade) 12086, Leon 12073
 ```{r}
 Climate <- df %>%
-  filter(STFIPS == "12")
+  filter(FIPS == "12073") %>%
+  filter(Year < 2019)
 ```
 
 ```{r}
 Test <- Climate %>%
   left_join(CITY_Pop) %>%
-  filter(!is.na(Name)) %>%
-  mutate(Year = Year)
+  filter(!is.na(Name))
 ```
 
 Make a long data frame.
@@ -323,7 +339,7 @@ TestL <- Test %>%
          factor_key = TRUE) %>%
   rename(Month = Year, Temperature = Variable) %>%
   mutate(Year = rep(Test$Year, times = 12),
-         popD = rep(Test$popD, times = 12))
+         population = rep(Test$population, times = 12))
 head(TestL)
 ```
 
@@ -333,11 +349,20 @@ Use the population density (rounded) as a random effect.
 ```{r}
 library(brms)
 
-TestL$YearC <- TestL$Year - 1960
+TestL <- TestL %>%
+  mutate(YearCentered = Year - round(median(Year)),
+         TemperatureCentered = Temperature - median(Temperature),
+         PopulationCentered = population - median(population))
+
 
 family <- gaussian()
-formula <- Temperature ~ YearC + (1 | Month) + (1 | popD)
-#formula <- Temperature ~ Year
+formula <- TemperatureCentered ~ YearCentered + (1 | Month) + (1 | population)
+
+formula <- TemperatureCentered ~ YearCentered  + PopulationCentered + (1 | Month)
+
+#formula <- TemperatureCentered ~ YearCentered + (1 | Month) 
+#formula <- TemperatureCentered ~ YearCentered + (1 | popD)
+#formula <- TemperatureCentered ~ YearCentered
 
 get_prior(formula, data = TestL, family = family)
 
@@ -345,12 +370,13 @@ fit1 <- brm(formula = formula,
             data = TestL,
             family = family,
             prior = c(set_prior("normal(0, 5)", class = "b"),
-                     set_prior("student_t(3, 55, 17)", class = "Intercept"),
+                     set_prior("student_t(3, 0, 17)", class = "Intercept"),
                      set_prior("student_t(3, 0, 17)", class = "sd"),
                      set_prior("student_t(3, 0, 17)", class = "sigma")),
 #                     set_prior("lkj(1)", class = "cor")),
-           control = list(adapt_delta = .9, max_treedepth = 15),
-           seed = 09121)
+           control = list(adapt_delta = .9, max_treedepth = 20),
+           seed = 1878121)
 
 fixef(fit1)
+ranef(fit1)
 ```
