@@ -319,8 +319,9 @@ df <- read.table(file = url,
 Leon County only. Remove years before 2019.  Orlando (Orange County) 12095, Miami (Miami-Dade) 12086, Leon 12073
 ```{r}
 Climate <- df %>%
-  filter(FIPS == "12073") %>%
-  filter(Year < 2019)
+  dplyr::filter(FIPS == "12073") %>%
+#  filter(STFIPS == "12") %>%
+  dplyr::filter(Year < 2019)
 ```
 
 ```{r}
@@ -339,26 +340,26 @@ TestL <- Test %>%
          factor_key = TRUE) %>%
   rename(Month = Year, Temperature = Variable) %>%
   mutate(Year = rep(Test$Year, times = 12),
-         population = rep(Test$population, times = 12))
+         population = rep(Test$population, times = 12),
+         Name = rep(Test$Name, times = 12))
 head(TestL)
 ```
 
 ## Model
 
-Use the population density (rounded) as a random effect.
+Use population as a random effect.
 ```{r}
 library(brms)
 
 TestL <- TestL %>%
   mutate(YearCentered = Year - round(median(Year)),
-         TemperatureCentered = Temperature - median(Temperature),
-         PopulationCentered = population - median(population))
+         TemperatureCentered = Temperature - median(Temperature))
 
 
 family <- gaussian()
 formula <- TemperatureCentered ~ YearCentered + (1 | Month) + (1 | population)
 
-formula <- TemperatureCentered ~ YearCentered  + PopulationCentered + (1 | Month)
+formula <- TemperatureCentered ~ YearCentered + (1 + YearCentered | Month) + (1 + YearCentered | population)
 
 #formula <- TemperatureCentered ~ YearCentered + (1 | Month) 
 #formula <- TemperatureCentered ~ YearCentered + (1 | popD)
